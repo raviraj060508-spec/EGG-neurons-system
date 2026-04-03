@@ -1,91 +1,104 @@
-import sys
+import streamlit as st
 import numpy as np
-from PyQt6 import QtWidgets, QtCore, QtGui
-import pyqtgraph as pg
+import pandas as pd
+import matplotlib.pyplot as plt
+import time
+import random
 
-class EEGMonitor(QtWidgets.QMainWindow):
-    def __init__(self):
-        super().__init__()
+st.set_page_config(page_title="EEG Monitoring System", layout="wide")
 
-        # --- Window Configuration ---
-        self.setWindowTitle("NeuroLink | Advanced EEG Real-Time Monitor")
-        self.resize(1100, 700)
-        self.setStyleSheet("background-color: #0f172a; color: #f8fafc;")
+# Title
+st.title("🧠 EEG Monitoring & Neurological Disorder Detection")
+st.write("Prototype system for real-time brain signal monitoring and analysis")
 
-        # --- Main Layout ---
-        self.central_widget = QtWidgets.QWidget()
-        self.setCentralWidget(self.central_widget)
-        self.layout = QtWidgets.QVBoxLayout(self.central_widget)
+# -----------------------------
+# Sidebar Controls
+# -----------------------------
+st.sidebar.header("Controls")
 
-        # Header
-        self.header = QtWidgets.QLabel("LIVE EEG DATA ARCHIVE - PATIENT ID: #2006-05-06")
-        self.header.setFont(QtGui.QFont("Arial", 14, QtGui.QFont.Weight.Bold))
-        self.header.setStyleSheet("color: #38bdf8; margin-bottom: 10px;")
-        self.layout.addWidget(self.header)
+signal_type = st.sidebar.selectbox(
+    "Select Brain Wave Type",
+    ["Alpha (Relaxed)", "Beta (Active)", "Theta (Drowsy)", "Delta (Deep Sleep)"]
+)
 
-        # --- Plotting Setup ---
-        # We use a GraphicsLayoutWidget for high-performance plotting
-        self.win = pg.GraphicsLayoutWidget()
-        self.layout.addWidget(self.win)
+duration = st.sidebar.slider("Signal Duration (seconds)", 5, 20, 10)
 
-        # EEG Channels Settings
-        self.n_channels = 3
-        self.points_to_show = 500  # Number of points visible on screen
-        self.data = [np.zeros(self.points_to_show) for _ in range(self.n_channels)]
-        self.plots = []
-        self.curves = []
+# -----------------------------
+# Generate EEG Signal
+# -----------------------------
+def generate_signal(signal_type, duration):
+    t = np.linspace(0, duration, 500)
 
-        colors = ['#38bdf8', '#10b981', '#fbbf24']  # Blue, Green, Amber
-        names = ["Channel Fp1 (Frontal)", "Channel C3 (Central)", "Channel O1 (Occipital)"]
+    if "Alpha" in signal_type:
+        signal = np.sin(2 * np.pi * 10 * t)
+    elif "Beta" in signal_type:
+        signal = np.sin(2 * np.pi * 20 * t)
+    elif "Theta" in signal_type:
+        signal = np.sin(2 * np.pi * 6 * t)
+    else:
+        signal = np.sin(2 * np.pi * 2 * t)
 
-        for i in range(self.n_channels):
-            p = self.win.addPlot(row=i, col=0)
-            p.setLabel('left', names[i], units='μV', color=colors[i])
-            p.showGrid(x=True, y=True, alpha=0.3)
-            p.setYRange(-50, 50)
-            
-            curve = p.plot(pen=pg.mkPen(colors[i], width=2))
-            self.plots.append(p)
-            self.curves.append(curve)
+    noise = np.random.normal(0, 0.5, len(t))
+    return t, signal + noise
 
-        # --- Status Bar ---
-        self.info_panel = QtWidgets.QHBoxLayout()
-        self.status = QtWidgets.QLabel("STATUS: ACTIVE MONITORING")
-        self.status.setStyleSheet("color: #ef4444; font-weight: bold;")
-        self.info_panel.addWidget(self.status)
+# -----------------------------
+# Display Graph
+# -----------------------------
+st.subheader("📊 Real-Time EEG Signal")
+
+t, signal = generate_signal(signal_type, duration)
+
+fig, ax = plt.subplots()
+ax.plot(t, signal)
+ax.set_xlabel("Time")
+ax.set_ylabel("Amplitude")
+ax.set_title("EEG Signal Simulation")
+
+st.pyplot(fig)
+
+# -----------------------------
+# AI-Based Detection (Basic Logic)
+# -----------------------------
+st.subheader("🤖 AI Analysis")
+
+avg_signal = np.mean(np.abs(signal))
+
+if avg_signal > 1.2:
+    result = "⚠️ High Risk of Seizure"
+elif avg_signal > 0.8:
+    result = "😟 Moderate Stress Level"
+else:
+    result = "😊 Normal Brain Activity"
+
+st.write("### Result:", result)
+
+# -----------------------------
+# Patient Stimuli Simulation
+# -----------------------------
+st.subheader("⚡ Stimuli Response Test")
+
+if st.button("Apply Stimulus (Light/Sound)"):
+    st.write("Stimulus Applied... Analyzing Response...")
+    time.sleep(2)
+
+    response = random.choice([
+        "Normal Response",
+        "Delayed Response",
+        "Abnormal Response ⚠️"
+    ])
+
+    st.success(f"Response: {response}")
+
+# -----------------------------
+# Patient Info Section
+# -----------------------------
+st.subheader("👤 Patient Info")
+
+name = st.text_input("Enter Patient Name")
+age = st.number_input("Enter Age", 1, 100)
+
+if st.button("Save Report"):
+    st.success(f"Report saved for {name}")
+
+       
         
-        self.freq_label = QtWidgets.QLabel("Sampling: 512Hz | Impedance: <5kΩ")
-        self.info_panel.addWidget(self.freq_label, alignment=QtCore.Qt.AlignmentFlag.AlignRight)
-        self.layout.addLayout(self.info_panel)
-
-        # --- Data Update Timer ---
-        self.timer = QtCore.QTimer()
-        self.timer.timeout.connect(self.update_data)
-        self.timer.start(30)  # Updates every 30ms
-
-        self.phase = 0
-
-    def update_data(self):
-        self.phase += 0.1
-        
-        for i in range(self.n_channels):
-            # Shift data to the left
-            self.data[i][:-1] = self.data[i][1:]
-            
-            # Generate "Realistic" EEG Signal
-            # Combination of sine waves (brain rhythms) + random noise
-            noise = np.random.normal(0, 2)
-            alpha_wave = 15 * np.sin(self.phase * (i + 1) * 0.8) 
-            beta_wave = 5 * np.sin(self.phase * 5)
-            
-            new_point = alpha_wave + beta_wave + noise
-            self.data[i][-1] = new_point
-            
-            # Update the plot curve
-            self.curves[i].setData(self.data[i])
-
-if __name__ == "__main__":
-    app = QtWidgets.QApplication(sys.argv)
-    monitor = EEGMonitor()
-    monitor.show()
-    sys.exit(app.exec())
